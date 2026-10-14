@@ -76,8 +76,8 @@ depths, visits, and node values; no tensors or pickle objects are required.
   function decoders. The ESM3 baseline retains the supplied generation API.
 - The reference sequence is folded once per backbone, and an LRU cache avoids
   repeated candidate folds. Evaluation metrics and timing are saved separately.
-- Plotting reads actual exported summaries. Unrelated training, LLM planning,
-  generic inverse-folding baselines, notebook widgets, IDE files, caches,
+- Unrelated training, LLM planning, generic inverse-folding baselines, plotting
+  and standalone analysis scripts, notebook widgets, IDE files, caches,
   credentials, internal audit records, and generated artifacts are excluded.
 
 ## Metrics and aggregation

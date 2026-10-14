@@ -9,7 +9,7 @@ and Xilin Chen.
 ProtInvTree uses a pretrained ESM3 policy to build sequences through
 focus-and-grounding actions, with MCTS and ESMFold-based structural rewards.
 This repository preparation provides single-chain PDB inference, CATH 4.2/4.3
-evaluation, an ESM3 sampling baseline, result summaries, and trade-off plotting.
+evaluation and an ESM3 sampling baseline.
 The locally modified ESM implementation is included so research-specific sampling
 behavior does not depend on an unrelated installed `esm` version.
 
@@ -28,7 +28,7 @@ intended inference environment; the paper reports A100 GPUs with 80 GB memory.
 ```bash
 conda create -n protinvtree python=3.10 -y
 conda activate protinvtree
-python -m pip install -e ".[plots]"
+python -m pip install -e .
 ```
 
 Install a PyTorch build appropriate for your CUDA environment. `torchvision`
@@ -135,19 +135,7 @@ atoms. Native sequence information is removed from policy prompts; it is used
 for reference folding and sequence evaluation. The output contains a FASTA,
 ESMFold structure, metrics, and a JSON search tree.
 
-## Analysis and plotting
-
-```bash
-python scripts/summarize_results.py \
-  --input results/cath42-mcts/results.json --output results/cath42-mcts/recomputed-summary.json
-
-python scripts/plot_tradeoff.py \
-  --summaries results/cath42-mcts/summary.json results/cath42-esm3/summary.json \
-  --metric novelty --output results/novelty-vs-sctm.pdf
-```
-
-`scripts/run_cath_sweep.sh` provides temperature and width sweeps. Plotting reads
-the exported evaluation summaries; experiment results are not bundled.
+`scripts/run_cath_sweep.sh` provides temperature and width sweeps.
 
 ## Tests
 

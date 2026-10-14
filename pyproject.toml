@@ -28,9 +28,6 @@ dependencies = [
   "zstd>=1.5",
 ]
 
-[project.optional-dependencies]
-plots = ["matplotlib>=3.7"]
-
 [project.scripts]
 protinvtree-evaluate = "protinvtree.evaluate:main"
 protinvtree-infer = "protinvtree.infer:main"
