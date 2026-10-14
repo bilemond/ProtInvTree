@@ -1,0 +1,8 @@
+{
+  "train": [],
+  "validation": [],
+  "test": [
+    "synthetic_b",
+    "synthetic_a"
+  ]
+}

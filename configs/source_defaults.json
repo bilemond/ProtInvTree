@@ -1,0 +1,19 @@
+{
+  "seed": 111,
+  "total_steps": 4,
+  "temperature": 0.3,
+  "expand_n": 2,
+  "pre_expand_n": 2,
+  "rollout_n": 1,
+  "simulations": 50,
+  "pre_expansion_depth": 2,
+  "c_param": 0.01,
+  "value_threshold": 0.0,
+  "complete_path_n": 1,
+  "final_selection": "greedy",
+  "selection": "random",
+  "schedule": "cosine",
+  "rollout_mode": "iterative",
+  "reward_reference": "target",
+  "reward_alpha": 1.0
+}

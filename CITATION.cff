@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use this research code, please cite the ProtInvTree paper."
+type: software
+title: "ESM-ProtInvTree"
+version: "0.1.0"
+authors:
+  - family-names: Liu
+    given-names: Mengdi
+  - family-names: Cheng
+    given-names: Xiaoxue
+  - family-names: Gao
+    given-names: Zhangyang
+  - family-names: Chang
+    given-names: Hong
+  - family-names: Tan
+    given-names: Cheng
+  - family-names: Shan
+    given-names: Shiguang
+  - family-names: Chen
+    given-names: Xilin
+preferred-citation:
+  type: conference-paper
+  title: "ProtInvTree: Deliberate Protein Inverse Folding with Reward-guided Tree Search"
+  authors:
+    - family-names: Liu
+      given-names: Mengdi
+    - family-names: Cheng
+      given-names: Xiaoxue
+    - family-names: Gao
+      given-names: Zhangyang
+    - family-names: Chang
+      given-names: Hong
+    - family-names: Tan
+      given-names: Cheng
+    - family-names: Shan
+      given-names: Shiguang
+    - family-names: Chen
+      given-names: Xilin
+  year: 2025
+  conference:
+    name: "39th Conference on Neural Information Processing Systems (NeurIPS 2025)"
