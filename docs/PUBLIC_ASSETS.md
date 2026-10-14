@@ -53,6 +53,10 @@ snapshot_download(
     repo_id="biohub/esm3-sm-open-v1",
     revision="47f0545b2b6daf26a93439a3cd610f4f7f3d5478",
     local_dir="../reproduction-assets/esm3",
+    ignore_patterns=[
+        "data/weights/esm3_structure_decoder_v0.pth",
+        "data/weights/esm3_function_decoder_v0.pth",
+    ],
 )
 snapshot_download(
     repo_id="facebook/esmfold_v1",
@@ -60,6 +64,10 @@ snapshot_download(
     local_dir="../reproduction-assets/esmfold",
 )
 ```
+
+The two omitted ESM3 decoder files total approximately 2.4 GB and are not used by
+this project's sequence-only inference or baseline. The upstream SDK's structure
+and function decoding requires those additional weights.
 
 Then run a small GPU check before a full evaluation:
 
@@ -71,8 +79,9 @@ python scripts/evaluate_cath.py --dataset CATH4.2 \
   --output-dir results/cath42-model-check
 ```
 
-These model checkpoints were not loaded for the software checks. Consult
-their asset terms. The fixed commits are verified public versions; their equality
+These fixed checkpoints were loaded for the real GPU smoke tests described in
+[VALIDATION.md](VALIDATION.md); weight sizes and SHA-256 were checked against the
+published LFS metadata. Consult their asset terms. Their equality
 with the paper's local weight files has not been proved.
 
 ## Public reproduction settings

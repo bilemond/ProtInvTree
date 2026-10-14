@@ -15,8 +15,9 @@ behavior does not depend on an unrelated installed `esm` version.
 
 **Licensing status:** the authors have deferred the research-code license
 decision. See [LICENSE.md](LICENSE.md).
-GPU inference and reproduction of the paper's numerical results have not yet
-been validated for this refactoring. See [validation](docs/VALIDATION.md).
+Small real-model GPU examples pass for PDB inference, CATH iterative/jumpy
+search, the ESM3 baseline and resume. The paper's full numerical results have
+not been reproduced. See [validation](docs/VALIDATION.md).
 Method choices and remaining differences are documented in
 [reproducibility notes](docs/REPRODUCIBILITY.md).
 
@@ -48,8 +49,10 @@ in source files. The default ESM3 loader downloads a snapshot; for local weights
 export ESM3_MODEL_DIR=/path/to/esm3-snapshot
 ```
 
-The directory must contain `data/weights/esm3_sm_open_v1.pth` and the other
-snapshot assets required by ESM3. ESMFold defaults to
+The directory must contain `data/weights/esm3_sm_open_v1.pth`,
+`data/weights/esm3_structure_encoder_v0.pth`, and the ESM3 tokenizer assets under
+`data/`. This project's sequence-only inference does not load the structure or
+function decoder weights. ESMFold defaults to
 `facebook/esmfold_v1`; use `--fold-model /path/to/esmfold-snapshot` for local weights.
 
 ## Validate the CATH input format
@@ -127,9 +130,9 @@ backbone and is `null` when only one sample is available.
 
 Resume validates saved sample identity, sequence metadata and finite metrics.
 Missing requested FASTA/PDB/tree files cause that sample to be regenerated;
-corrupt result JSON is recorded as a failure. The generation alphabet is recorded
-in the manifest; runs created before this restriction require a new output
-directory to avoid mixing sampling protocols.
+corrupt result JSON is recorded as a failure. The generation alphabet and
+sampling seed protocol are recorded in the manifest; runs created under an older
+protocol require a new output directory to avoid mixing sampling behavior.
 
 ## Single PDB inference
 
@@ -142,6 +145,22 @@ The selected PDB chain must contain canonical residues and complete N/CA/C/O
 atoms. Native sequence information is removed from policy prompts; it is used
 for reference folding and sequence evaluation. The output contains a FASTA,
 ESMFold structure, metrics, and a JSON search tree.
+
+A tested small example is [1UBQ](https://www.rcsb.org/structure/1UBQ), chain A
+(76 residues). With downloaded weights, run:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 python scripts/infer_pdb.py \
+  --pdb /path/to/1UBQ.pdb --chain-id A \
+  --policy-device cuda:0 --reward-device cuda:1 \
+  --fold-model /path/to/esmfold-snapshot \
+  --total-steps 4 --pre-expansion-depth 1 --simulations 20 \
+  --output-dir results/1ubq-smoke
+```
+
+Set `ESM3_MODEL_DIR` as above. Use a new output directory for each inference run.
+This example tests the execution path; its native-sequence reconstruction is not
+evidence of novel design or held-out benchmark performance.
 
 `scripts/run_cath_sweep.sh` provides temperature and width sweeps.
 

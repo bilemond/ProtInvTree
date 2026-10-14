@@ -74,6 +74,7 @@ def main(argv=None):
              "residue_indices": record.residue_indices} for i, record in enumerate(selected)]
     configuration = {"models_and_search": cfg, "dataset": args.dataset, "subset": args.subset,
                      "generation_alphabet": "".join(sorted(AMINO_ACIDS)),
+                     "sampling_seed_protocol": "after-prompt-encoding-v1",
                      "min_length": args.min_length, "max_length": args.max_length,
                      "start_index": args.start_index, "end_index": args.end_index,
                      "samples_per_target": args.samples_per_target, "method": args.method,

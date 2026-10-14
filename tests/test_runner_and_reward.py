@@ -1,12 +1,13 @@
 import math
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 import numpy as np
 import torch
 from torch import nn
-from esm.sdk.api import ESMProtein
+from esm.sdk.api import ESMProtein, ESMProteinTensor
+from esm.models.esm3 import ESM3
 
 from protinvtree.options import DEFAULTS
 from protinvtree.reward import Reward_model
@@ -178,9 +179,55 @@ class RunnerTests(unittest.TestCase):
                 self.assertIn(tokenizer.encode(residue, add_special_tokens=False)[0], config.invalid_ids)
             for residue in "ACDEFGHIKLMNPQRSTVWY":
                 self.assertNotIn(tokenizer.encode(residue, add_special_tokens=False)[0], config.invalid_ids)
-            self.assertIsNone(prompt.sequence)
-            return ESMProtein(sequence="A" * 10)
+            self.assertIsInstance(prompt, ESMProteinTensor)
+            self.assertEqual(int((prompt.sequence == tokenizer.mask_token_id).sum()), 10)
+            return ESMProteinTensor(
+                sequence=torch.tensor(tokenizer.encode("A" * 10), device=prompt.device),
+                coordinates=prompt.coordinates,
+            )
 
         with patch.object(runner.policy.model, "generate", side_effect=generate, create=True):
             result, _, _ = runner.design(protein, protein.sequence, seed=111, method="esm3")
         self.assertEqual(result["sequence"], "A" * 10)
+
+    def test_baseline_real_sampling_api_does_not_load_unused_decoders(self):
+        runner = self.runner()
+        model = runner.policy.model
+        model.generate = MethodType(ESM3.generate, model)
+        model.batch_generate = MethodType(ESM3.batch_generate, model)
+        protein = ESMProtein(sequence="ACDEFGHIKL", coordinates=torch.zeros(10, 37, 3))
+        with patch.object(model, "decode", side_effect=AssertionError("unused decoders"), create=True) as decode:
+            result, _, _ = runner.design(protein, protein.sequence, seed=111, method="esm3")
+        decode.assert_not_called()
+        self.assertEqual(result["sequence"], "A" * 10)
+        self.assertEqual(model.calls, runner.config["total_steps"])
+        self.assertFalse(model.saw_native_sequence)
+
+    def test_sampling_seed_is_independent_of_lazy_encoder_initialization(self):
+        class LazyInitModel(FakeESM3):
+            def encode(self, protein):
+                if not getattr(self, "initialized", False):
+                    torch.rand(128)
+                    self.initialized = True
+                return super().encode(protein)
+
+            def logits(self, tokens, config):
+                output = super().logits(tokens, config)
+                output.logits.sequence.fill_(-100.0)
+                for residue in "AC":
+                    output.logits.sequence[..., self.tokenizers.sequence.encode(residue, add_special_tokens=False)[0]] = 0.0
+                return output
+
+        for method in ("mcts", "esm3"):
+            with self.subTest(method=method):
+                model = LazyInitModel()
+                model.generate = MethodType(ESM3.generate, model)
+                model.batch_generate = MethodType(ESM3.batch_generate, model)
+                cfg = {**DEFAULTS, "policy_device": "cpu", "reward_device": "cpu", "pre_expansion_depth": 1}
+                with patch("protinvtree.policy.ESM3.from_pretrained", return_value=model), patch("protinvtree.runner.Reward_model", return_value=FakeReward()):
+                    runner = DesignRunner(cfg)
+                protein = ESMProtein(sequence="ACDEFGHIKL", coordinates=torch.zeros(10, 37, 3))
+                first, _, first_tree = runner.design(protein, protein.sequence, seed=111, method=method)
+                second, _, second_tree = runner.design(protein, protein.sequence, seed=111, method=method)
+                self.assertEqual(first["sequence"], second["sequence"])
+                self.assertEqual(first_tree, second_tree)

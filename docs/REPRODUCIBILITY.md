@@ -79,7 +79,13 @@ depths, visits, and node values; no tensors or pickle objects are required.
   and may change the returned sequence. The initial prepared version always
   preferred a terminal node; the subsequent source audit restored greedy as the default.
 - Sequence decoding during MCTS does not instantiate unused ESM3 structure and
-  function decoders. The ESM3 baseline retains the supplied generation API.
+  function decoders. The ESM3 baseline uses the supplied token generation API
+  and decodes only sequence, avoiding those same unused decoder models.
+- The per-sample RNG is restored after prompt encoding: ESM3 constructs its
+  structure encoder lazily, and parameter initialization consumes random numbers
+  even though pretrained weights replace them. Resetting after encoding makes
+  cold/warm model state independent of the sampling seed. The manifest records
+  `sampling_seed_protocol`; earlier runs require a new output directory.
 - The reference sequence is folded once per backbone, and an LRU cache avoids
   repeated candidate folds. Evaluation metrics and timing are saved separately.
 - Unrelated training, LLM planning, generic inverse-folding baselines, plotting

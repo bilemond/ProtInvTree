@@ -56,19 +56,22 @@ class DesignRunner:
         started = time.perf_counter()
         cfg = self.config
         tree, simulations, search_value, search_complete = [], 0, None, True
+        initial = self.policy.prepare_initial_state(protein)
+        # ESM3 initializes its structure encoder lazily during the first encode.
+        # Restore the sample RNG after encoding so cold/warm model state and job
+        # partitioning do not change the generation stream for the same seed.
+        seed_everything(seed)
         if method == "esm3":
-            # Remove all native sequence and annotation tracks from the prompt.
-            import attr
-            prompt = attr.evolve(protein, sequence=None, secondary_structure=None, sasa=None,
-                                 function_annotations=None)
-            generated = self.policy.model.generate(prompt, GenerationConfig(
+            # Generate tokens and decode only the sequence, avoiding two unused
+            # decoder models required by the raw-protein generation wrapper.
+            generated = self.policy.model.generate(initial, GenerationConfig(
                 track="sequence", num_steps=cfg["total_steps"], temperature=cfg["temperature"],
                 strategy=cfg["selection"], schedule=cfg["schedule"],
                 invalid_ids=canonical_invalid_ids(self.policy.tokenizers.sequence)))
             if isinstance(generated, ESMProteinError):
                 raise RuntimeError(generated.error_msg)
+            generated = self.policy.decode_state(generated)
         else:
-            initial = self.policy.prepare_initial_state(protein)
             node_count.set_count(0)
             expand_count.set_count(0)
             search = MCTS(self.agent, initial, self.logger, cfg["c_param"], cfg["value_threshold"],
