@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this research code, please cite the ProtInvTree paper."
 type: software
-title: "ESM-ProtInvTree"
+title: "ProtInvTree"
 version: "0.1.0"
 authors:
   - family-names: Liu

@@ -13,8 +13,7 @@ The original license and contribution information are preserved in
 Unused notebook widgets, experimental SDK helpers and SageMaker clients are
 omitted. The license information distinguishes the code license
 from model-weight and service terms; consult the linked upstream agreements.
-No model weights are bundled. The package name includes ESM to identify the base
-implementation.
+No model weights are bundled.
 
 This preparation additionally changes `esm/utils/constants/esm3.py` to accept
 `ESM3_MODEL_DIR` or download the model snapshot, replacing a server-specific path.

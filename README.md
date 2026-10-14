@@ -26,8 +26,8 @@ Use an isolated Python 3.10–3.12 environment. Linux with an NVIDIA GPU is the
 intended inference environment; the paper reports A100 GPUs with 80 GB memory.
 
 ```bash
-conda create -n esm-protinvtree python=3.10 -y
-conda activate esm-protinvtree
+conda create -n protinvtree python=3.10 -y
+conda activate protinvtree
 python -m pip install -e ".[plots]"
 ```
 

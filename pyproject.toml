@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "esm-protinvtree"
+name = "protinvtree"
 version = "0.1.0"
-description = "ESM-ProtInvTree: reward-guided tree search for protein inverse folding"
+description = "ProtInvTree: reward-guided tree search for protein inverse folding"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
