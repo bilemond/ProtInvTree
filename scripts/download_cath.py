@@ -6,6 +6,7 @@ import json
 from pathlib import Path, PurePosixPath
 import shutil
 import tarfile
+import tempfile
 import urllib.request
 
 DATA_ARCHIVE = "https://github.com/A4Bio/ProteinInvBench/releases/download/dataset_release/data.tar.gz"
@@ -67,41 +68,58 @@ def extract_cath(archive, output, dataset):
     return extracted
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", choices=("CATH4.2", "CATH4.3", "archive"), default="CATH4.2")
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--cache-dir", type=Path, required=True)
-    args = parser.parse_args()
-    if args.output_dir.exists() and any(args.output_dir.iterdir()):
-        parser.error("Output directory must be empty")
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    if args.dataset == "CATH4.3":
+def populate_output(dataset, output, cache):
+    """Prepare a complete dataset in a staging directory before publishing it."""
+    if dataset == "CATH4.3":
         for name, size in (("chain_set.jsonl", 536944512), ("chain_set_splits.json", 201137)):
-            cached = args.cache_dir / "cath4.3" / name
+            cached = cache / "cath4.3" / name
             download(CATH43_BASE + name, cached, expected_size=size)
-            shutil.copyfile(cached, args.output_dir / name)
+            shutil.copyfile(cached, output / name)
         source = CATH43_BASE
         # Subsets are not part of this release asset. Do not fabricate memberships.
         extracted = list(FILES[:2])
     else:
-        archive = args.cache_dir / "data.tar.gz"
+        archive = cache / "data.tar.gz"
         download(DATA_ARCHIVE, archive, DATA_BYTES, DATA_MD5)
         source = DATA_ARCHIVE
-        if args.dataset == "archive":
+        if dataset == "archive":
             with tarfile.open(archive, "r:gz") as bundle:
                 names = [member.name for member in bundle if member.isfile()]
-            (args.output_dir / "archive_members.json").write_text(json.dumps(names, indent=2) + "\n")
+            (output / "archive_members.json").write_text(json.dumps(names, indent=2) + "\n")
             print(json.dumps([name for name in names if "cath" in name.lower()], indent=2))
-            return 0
-        extracted = extract_cath(archive, args.output_dir, args.dataset)
+            return
+        extracted = extract_cath(archive, output, dataset)
     for name in FILES[:2]:
-        if not (args.output_dir / name).exists():
+        if not (output / name).exists():
             raise FileNotFoundError(f"Official download did not provide {name}; inspect archive members")
-    provenance = {"dataset": args.dataset, "source_url": source, "extracted_members": extracted,
-                  "sha256": {name: checksum(args.output_dir / name) for name in FILES
-                             if (args.output_dir / name).exists()}}
-    (args.output_dir / "download_provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+    provenance = {"dataset": dataset, "source_url": source, "extracted_members": extracted,
+                  "sha256": {name: checksum(output / name) for name in FILES
+                             if (output / name).exists()}}
+    (output / "download_provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", choices=("CATH4.2", "CATH4.3", "archive"), default="CATH4.2")
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--cache-dir", type=Path, required=True)
+    args = parser.parse_args(argv)
+    if args.output_dir.exists() and (not args.output_dir.is_dir() or any(args.output_dir.iterdir())):
+        parser.error("Output directory must be empty")
+    cached_files = ([args.cache_dir / "cath4.3" / name for name in FILES[:2]]
+                    if args.dataset == "CATH4.3" else [args.cache_dir / "data.tar.gz"])
+    if any(path.resolve().is_relative_to(args.output_dir.resolve()) for path in cached_files):
+        parser.error("Download cache files must be outside the output directory")
+    args.output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=args.output_dir.name + ".download-", dir=args.output_dir.parent) as temporary:
+        staged = Path(temporary)
+        populate_output(args.dataset, staged, args.cache_dir)
+        # Recheck before publication; never replace output populated by another run.
+        if args.output_dir.exists():
+            if not args.output_dir.is_dir() or any(args.output_dir.iterdir()):
+                raise FileExistsError(f"Refusing to overwrite output: {args.output_dir}")
+            args.output_dir.rmdir()
+        staged.replace(args.output_dir)
     print(f"Saved {args.dataset} to {args.output_dir}", flush=True)
     return 0
 

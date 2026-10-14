@@ -10,6 +10,13 @@ from esm.utils.generation import _batch_forward, _sample_per_prompt, _slice_tens
 from esm.sdk.api import ESM3InferenceClient, ESMProtein, ESMProteinError, ESMProteinTensor, GenerationConfig, LogitsOutput, SamplingConfig, SamplingTrackConfig
 from esm.tokenization import TokenizerCollectionProtocol
 from esm.utils.decoding import decode_sequence
+from .data import AMINO_ACIDS
+
+
+def canonical_invalid_ids(tokenizer):
+    """Restrict generated residues to the alphabet accepted by folding/evaluation."""
+    valid_ids = set(tokenizer.encode("".join(sorted(AMINO_ACIDS)), add_special_tokens=False))
+    return sorted(set(tokenizer.all_token_ids) - valid_ids)
 
 class Policy_model(nn.Module):
 
@@ -67,7 +74,7 @@ class Policy_model(nn.Module):
 
     def roll_out_final_states_given_batched_states(self, batched_tokens: _BatchedESMProteinTensor, sampling_params: dict, sequence_lengths: Sequence[int], total_to_sample: Sequence[int], depth: int) -> list[ESMProteinTensor]:
         total_steps = sampling_params['total_steps']
-        generating_config = GenerationConfig(track='sequence', num_steps=total_steps, temperature=sampling_params['temperature'], top_p=sampling_params['top_p'], strategy=sampling_params['strategy'], schedule=sampling_params['schedule'])
+        generating_config = GenerationConfig(track='sequence', num_steps=total_steps, temperature=sampling_params['temperature'], top_p=sampling_params['top_p'], strategy=sampling_params['strategy'], schedule=sampling_params['schedule'], invalid_ids=canonical_invalid_ids(self.tokenizers.sequence))
         track_sample_config = SamplingTrackConfig(temperature=sampling_params['temperature'], top_p=sampling_params['top_p'], invalid_ids=generating_config.invalid_ids)
         sampling_config = SamplingConfig(**{'sequence': track_sample_config})
         expand_N = sampling_params['n']
@@ -122,7 +129,7 @@ class Policy_model(nn.Module):
             expand_states: A list of expanded states. 每一行表示第一个token的n个采样结果
         """
         total_steps = expansion_sampling_params['total_steps']
-        generating_config = GenerationConfig(track='sequence', num_steps=total_steps, temperature=expansion_sampling_params['temperature'], schedule=expansion_sampling_params['schedule'], top_p=expansion_sampling_params['top_p'], strategy=expansion_sampling_params['strategy'])
+        generating_config = GenerationConfig(track='sequence', num_steps=total_steps, temperature=expansion_sampling_params['temperature'], schedule=expansion_sampling_params['schedule'], top_p=expansion_sampling_params['top_p'], strategy=expansion_sampling_params['strategy'], invalid_ids=canonical_invalid_ids(self.tokenizers.sequence))
         track_sample_config = SamplingTrackConfig(temperature=expansion_sampling_params['temperature'], top_p=expansion_sampling_params['top_p'], invalid_ids=generating_config.invalid_ids)
         sampling_config = SamplingConfig(**{'sequence': track_sample_config})
         expand_N = expansion_sampling_params['n']

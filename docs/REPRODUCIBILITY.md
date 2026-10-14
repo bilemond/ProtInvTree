@@ -59,6 +59,12 @@ depths, visits, and node values; no tensors or pickle objects are required.
   is never implicitly evaluated as a boolean or deduplicated by object identity.
 - Mixed-length batch outputs are trimmed to each state's true token length;
   padding is removed before rollout decoding and further expansion.
+- Generation is restricted to 20 canonical residues, consistently for expansion,
+  rollout and the ESM3 baseline. The source default blocked X but still allowed
+  B/U/Z/O and gap symbols that the folding reward rejects. This correction changes
+  the sampling distribution; previous sequence-equivalence checks do not prove
+  equivalence of this restricted distribution. The manifest records the alphabet
+  and prevents resuming runs created under the previous sampling protocol.
 - A supplied helper returned a bare sequence tensor when a track already existed;
   it now returns the complete `ESMProteinTensor`.
 - Completed paths are counted once per current tree, rather than cumulatively

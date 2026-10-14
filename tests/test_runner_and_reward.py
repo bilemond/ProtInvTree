@@ -167,3 +167,20 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result["reward"], 0.8)
         self.assertGreater(len(tree), 2)
         self.assertFalse(runner.policy.model.saw_native_sequence)
+
+    def test_baseline_uses_the_same_canonical_residue_restriction(self):
+        runner = self.runner()
+        protein = ESMProtein(sequence="ACDEFGHIKL", coordinates=torch.zeros(10, 37, 3))
+
+        def generate(prompt, config):
+            tokenizer = runner.policy.tokenizers.sequence
+            for residue in "XBUZO.-":
+                self.assertIn(tokenizer.encode(residue, add_special_tokens=False)[0], config.invalid_ids)
+            for residue in "ACDEFGHIKLMNPQRSTVWY":
+                self.assertNotIn(tokenizer.encode(residue, add_special_tokens=False)[0], config.invalid_ids)
+            self.assertIsNone(prompt.sequence)
+            return ESMProtein(sequence="A" * 10)
+
+        with patch.object(runner.policy.model, "generate", side_effect=generate, create=True):
+            result, _, _ = runner.design(protein, protein.sequence, seed=111, method="esm3")
+        self.assertEqual(result["sequence"], "A" * 10)

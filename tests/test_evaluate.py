@@ -68,3 +68,59 @@ class EvaluateTests(unittest.TestCase):
             summary = json.loads((Path(directory) / "summary.json").read_text())
             self.assertFalse(summary["metadata"]["complete"])
             self.assertEqual(len(summary["metadata"]["failed_samples"]), 4)
+
+    def test_resume_regenerates_samples_with_missing_requested_outputs(self):
+        for filename in ("sequence.fasta", "folded.pdb", "tree.json"):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as directory:
+                FakeRunner.calls = 0
+                args = self.args(directory) + ["--save-pdb", "--save-tree"]
+                with patch("protinvtree.runner.DesignRunner", FakeRunner), patch.object(Backbone, "to_protein", return_value=object()):
+                    self.assertEqual(main(args), 0)
+                    sample = sorted((Path(directory) / "samples").iterdir())[0]
+                    (sample / filename).unlink()
+                    self.assertEqual(main(args + ["--resume"]), 0)
+                    self.assertEqual(FakeRunner.calls, 5)
+                self.assertTrue((sample / filename).is_file())
+
+    def test_corrupt_resume_is_reported_and_clears_stale_complete_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = self.args(directory)
+            with patch("protinvtree.runner.DesignRunner", FakeRunner), patch.object(Backbone, "to_protein", return_value=object()):
+                self.assertEqual(main(args), 0)
+                sample = sorted((Path(directory) / "samples").iterdir())[0]
+                (sample / "result.json").write_text("{broken")
+                self.assertEqual(main(args + ["--resume", "--continue-on-error"]), 1)
+            summary = json.loads((Path(directory) / "summary.json").read_text())
+            self.assertFalse(summary["metadata"]["complete"])
+            self.assertEqual(summary["aggregate"]["samples"], 3)
+            self.assertEqual(len(summary["metadata"]["failed_samples"]), 1)
+
+    def test_resume_rejects_missing_or_nonfinite_metrics(self):
+        for invalid in (None, float("nan")):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as directory:
+                args = self.args(directory)
+                with patch("protinvtree.runner.DesignRunner", FakeRunner), patch.object(Backbone, "to_protein", return_value=object()):
+                    self.assertEqual(main(args), 0)
+                    sample = sorted((Path(directory) / "samples").iterdir())[0] / "result.json"
+                    result = json.loads(sample.read_text())
+                    if invalid is None:
+                        del result["sc_tm_score"]
+                    else:
+                        result["sc_tm_score"] = invalid
+                    sample.write_text(json.dumps(result))
+                    self.assertEqual(main(args + ["--resume", "--continue-on-error"]), 1)
+                summary = json.loads((Path(directory) / "summary.json").read_text())
+                self.assertFalse(summary["metadata"]["complete"])
+                self.assertEqual(summary["aggregate"]["samples"], 3)
+
+    def test_resume_rejects_the_previous_unrestricted_sampling_protocol(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = self.args(directory)
+            with patch("protinvtree.runner.DesignRunner", FakeRunner), patch.object(Backbone, "to_protein", return_value=object()):
+                self.assertEqual(main(args), 0)
+                manifest_path = Path(directory) / "manifest.json"
+                manifest = json.loads(manifest_path.read_text())
+                del manifest["configuration"]["generation_alphabet"]
+                manifest_path.write_text(json.dumps(manifest))
+                with self.assertRaises(SystemExit):
+                    main(args + ["--resume"])

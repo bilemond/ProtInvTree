@@ -98,6 +98,8 @@ Useful options:
 | `--final-selection greedy/best-terminal` | Budget-exhaustion selection; greedy matches the original source |
 
 The source defaults use iterative rollouts and a target-backbone reward. The
+policy restricts sampled residues to the 20 canonical amino acids accepted by
+the folding and evaluation pipeline, for both MCTS and the ESM3 baseline. The
 paper describes single-step jumpy denoising; use `--config configs/jumpy.json` to
 enable that path. Both settings are explicit and are not asserted to reproduce
 all paper tables. For metric definitions and discrepancies in the supplied
@@ -122,6 +124,12 @@ compares ESMFold(candidate) to the input backbone. Both TM scores are normalized
 by reference length. They are reported separately from the MCTS node's historical
 `search_value`. Diversity is the mean pairwise sequence difference within each
 backbone and is `null` when only one sample is available.
+
+Resume validates saved sample identity, sequence metadata and finite metrics.
+Missing requested FASTA/PDB/tree files cause that sample to be regenerated;
+corrupt result JSON is recorded as a failure. The generation alphabet is recorded
+in the manifest; runs created before this restriction require a new output
+directory to avoid mixing sampling protocols.
 
 ## Single PDB inference
 

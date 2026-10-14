@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from .agent import Agent
-from .policy import Policy_model
+from .policy import Policy_model, canonical_invalid_ids
 from .reward import Reward_model
 from .searching.search import MCTS
 from .searching.utils import node_count, expand_count
@@ -63,7 +63,8 @@ class DesignRunner:
                                  function_annotations=None)
             generated = self.policy.model.generate(prompt, GenerationConfig(
                 track="sequence", num_steps=cfg["total_steps"], temperature=cfg["temperature"],
-                strategy=cfg["selection"], schedule=cfg["schedule"]))
+                strategy=cfg["selection"], schedule=cfg["schedule"],
+                invalid_ids=canonical_invalid_ids(self.policy.tokenizers.sequence)))
             if isinstance(generated, ESMProteinError):
                 raise RuntimeError(generated.error_msg)
         else:

@@ -28,6 +28,9 @@ The helper verifies the CATH 4.2 archive against the published size and MD5,
 supports `cath`/`cath4.2` directory conventions, records extracted names and file
 hashes, and refuses to overwrite datasets. Archive member names and extraction
 have not been validated against a full downloaded archive.
+Files are prepared in a temporary staging directory and published only after
+the required files and checksums succeed. Interrupted downloads can be retried
+with the same output directory; keep the cache files outside that directory.
 
 ## Model snapshots
 

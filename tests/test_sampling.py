@@ -114,3 +114,25 @@ class SamplingTests(unittest.TestCase):
             self.policy.batch_ESMTensor(children), self.params, [len(child) for child in children],
             remaining_masks, 1)
         self.assertEqual([candidates[0].sequence for candidates in output], ["A" * 10, "A" * 5])
+
+    def test_noncanonical_logits_are_excluded_from_expansion_and_rollout(self):
+        original_logits = self.model.logits
+
+        def noncanonical_logits(tokens, config):
+            output = original_logits(tokens, config)
+            for residue in "XBUZO.-":
+                token = self.model.tokenizers.sequence.encode(residue, add_special_tokens=False)[0]
+                output.logits.sequence[..., token] = 200.0
+            return output
+
+        with patch.object(self.model, "logits", side_effect=noncanonical_logits):
+            initial = self.policy.prepare_initial_state(self.protein)
+            child = self.policy.expand_nodes_given_batched_states(
+                self.policy.batch_ESMTensor([initial]), self.params, [12], [10], [0])[0][0]
+            decoded = self.policy.decode_state(child).sequence
+            self.assertTrue(set(decoded) <= {"A", "_"})
+            for mode in ("iterative", "jumpy"):
+                self.policy.rollout_mode = mode
+                output = self.policy.roll_out_final_states_given_batched_states(
+                    self.policy.batch_ESMTensor([child]), self.params, [12], [10], 1)
+                self.assertEqual(output[0][0].sequence, "A" * 10)

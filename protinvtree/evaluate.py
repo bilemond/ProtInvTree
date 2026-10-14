@@ -4,12 +4,37 @@ import argparse
 from datetime import datetime, timezone
 import json
 import logging
+import math
 from pathlib import Path
 import platform
 
-from .data import read_cath
+from .data import AMINO_ACIDS, read_cath
 from .options import add_model_options, parse_options
-from .results import atomic_json, sample_seed, write_tables
+from .results import METRICS, atomic_json, sample_seed, write_tables
+
+
+def validate_saved_result(result, backbone, sample_index, seed, method):
+    if not isinstance(result, dict):
+        raise ValueError("Saved sample must be a JSON object")
+    if (result.get("name"), result.get("sample_index"), result.get("seed"), result.get("method")) != (
+        backbone.name, sample_index, seed, method
+    ):
+        raise ValueError("Saved sample identity does not match the evaluation")
+    sequence = result.get("sequence")
+    if (not isinstance(sequence, str) or len(sequence) != len(backbone.sequence)
+            or not set(sequence) <= AMINO_ACIDS
+            or result.get("reference_sequence") != backbone.sequence
+            or result.get("original_length") != backbone.original_length
+            or result.get("residue_indices") != backbone.residue_indices):
+        raise ValueError("Saved sample sequence or backbone metadata is invalid")
+    for field in (*METRICS, "search_value"):
+        value = result.get(field)
+        if field == "search_value" and value is None and field in result:
+            continue
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError(f"Saved sample has missing or nonfinite metric: {field}")
+    if type(result.get("search_complete")) is not bool:
+        raise ValueError("Saved sample search_complete must be a boolean")
 
 
 def create_parser():
@@ -48,6 +73,7 @@ def main(argv=None):
              "original_length": record.original_length, "length": len(record.sequence),
              "residue_indices": record.residue_indices} for i, record in enumerate(selected)]
     configuration = {"models_and_search": cfg, "dataset": args.dataset, "subset": args.subset,
+                     "generation_alphabet": "".join(sorted(AMINO_ACIDS)),
                      "min_length": args.min_length, "max_length": args.max_length,
                      "start_index": args.start_index, "end_index": args.end_index,
                      "samples_per_target": args.samples_per_target, "method": args.method,
@@ -92,14 +118,19 @@ def main(argv=None):
             sample_dir = output / "samples" / sample_id
             result_path = sample_dir / "result.json"
             seed = sample_seed(cfg["seed"], backbone.name, sample_index)
-            if args.resume and result_path.exists():
-                with result_path.open() as handle:
-                    result = json.load(handle)
-                if (result["name"], result["sample_index"], result["seed"]) != (backbone.name, sample_index, seed):
-                    raise ValueError(f"Invalid saved sample: {result_path}")
-                results.append(result)
-                continue
             try:
+                if args.resume and result_path.exists():
+                    with result_path.open() as handle:
+                        result = json.load(handle)
+                    validate_saved_result(result, backbone, sample_index, seed, args.method)
+                    required = [sample_dir / "sequence.fasta"]
+                    if args.save_pdb:
+                        required.append(sample_dir / "folded.pdb")
+                    if args.save_tree:
+                        required.append(sample_dir / "tree.json")
+                    if all(path.is_file() and path.stat().st_size > 0 for path in required):
+                        results.append(result)
+                        continue
                 if runner is None:
                     runner = DesignRunner(cfg)
                 if protein is None:
